@@ -1,0 +1,3 @@
+setenv PATH "$PATH"":""/home/cdtec/bin"
+setenv PERL5LIB "$PERL5LIB"":""/home/cdtec/bin"
+setenv MANPATH "$MANPATH"":""/home/cdtec/man"
