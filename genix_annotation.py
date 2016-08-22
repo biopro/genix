@@ -3,6 +3,9 @@
 print '''
 ############################################################
 #////////// Genix Annotation //////////////////////////////#
+# An automated pipeline for bacterial genome annotation    #
+# Version: 0.4                                             #
+# Reference: KREMER et al, 2016                            # 
 ############################################################
 '''
 
