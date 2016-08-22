@@ -8,7 +8,11 @@ Genix is an online automated pipeline for bacterial genome annotation. The progr
 
 #### the *get_database.sh* script
 
+<<<<<<< HEAD
 The user may also create an optimized protein database for a given taxonomic group of interest by using the `get_database.sh` by providing it's tax_id. First, a dataset of proteins associated to the tax_id Is downloaded from `Uniprot` and used to build a raw dataset, which may contain several redundances. `CD-HIT` (Li & Godzik 2006) is used to build a non-redundant dataset, which is paserd by an python script to identify the best annotation from each cluster based on the protein-score and the source from where the proteins were obtained (Uniprot-Swissprot or Uniprot-trEMBL). Finally, the refined dataset is used to generate the final protein `BLAST` database (Altschul et al. 1990; Camacho et al. 2009).
+=======
+The user may also create an optimized protein database for a given taxonomic group of interest by using the `get_database.sh` by providing it's tax_id. First, a dataset of proteins associated to the tax_id Is downloaded from `Uniprot` and used to build a raw dataset, which may contain several redundances. `CD-HIT` (Li & Godzik 2006) is used to build a non-redundant dataset, which is paserd by an python script to identify the best annotation from each cluster based on the protein-score and the source from where the proteins were obtained (Uniprot-Swissprot or Uniprot-trEMBL). Finally, the refined dataset is used to generate the final protein `BLAST` database (Altschul et al. 1990; Camacho et al. 2009). 
+>>>>>>> 959a9042d0fbe2e79480a8ca74146db34ad45b6d
 
 ## Installation
 
@@ -35,6 +39,7 @@ correctly specified. Check if the binaries Prodigal (“bin/prodigal/”), Arago
 ## Webserver
 
 Genix is also available as an webserver through the URL [http://labbioinfo.ufpel.edu.br/genix](http://labbioinfo.ufpel.edu.br/genix).
+<<<<<<< HEAD
 
 ##  Contact and Feedback
 
@@ -43,3 +48,5 @@ Frederico Schmitt Kremer,
 fred.s.kremer@gmail.com / fredericok.cdtec@ufpel.edu.br
 Luciano da Silva Pinto,
 dmpluc@ufpel.edu.br / ls_pinto@hotmail.com
+=======
+>>>>>>> 959a9042d0fbe2e79480a8ca74146db34ad45b6d
