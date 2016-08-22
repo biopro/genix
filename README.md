@@ -52,24 +52,24 @@ dmpluc@ufpel.edu.br / ls_pinto@hotmail.com
 
 ## References
 
-Altschul, S.F. et al., 1990. Basic local alignment search tool. Journal of molecular biology, 215(3), pp.403–10.
+* Altschul, S.F. et al., 1990. Basic local alignment search tool. Journal of molecular biology, 215(3), pp.403–10.
 
-Camacho, C. et al., 2009. BLAST+: architecture and applications. BMC bioinformatics, 10(1), p.421.
+* Camacho, C. et al., 2009. BLAST+: architecture and applications. BMC bioinformatics, 10(1), p.421.
 
-Eberhardt, R.Y. et al., 2012. AntiFam: a tool to help identify spurious ORFs in protein annotation. Database : the journal of biological databases and curation, 2012, p.bas003.
+* Eberhardt, R.Y. et al., 2012. AntiFam: a tool to help identify spurious ORFs in protein annotation. Database : the journal of biological databases and curation, 2012, p.bas003.
 
-Eddy, S.R., 2011. Accelerated Profile HMM Searches. W. R. Pearson, ed. PLoS computational biology, 7(10), p.e1002195.
+* Eddy, S.R., 2011. Accelerated Profile HMM Searches. W. R. Pearson, ed. PLoS computational biology, 7(10), p.e1002195.
 
-Griffiths-Jones, S. et al., 2003. Rfam: an RNA family database. Nucleic acids research, 31(1), pp.439–41.
+* Griffiths-Jones, S. et al., 2003. Rfam: an RNA family database. Nucleic acids research, 31(1), pp.439–41.
 
-Hyatt, D. et al., 2010. Prodigal: prokaryotic gene recognition and translation initiation site identification. BMC bioinformatics, 11, p.119.
+* Hyatt, D. et al., 2010. Prodigal: prokaryotic gene recognition and translation initiation site identification. BMC bioinformatics, 11, p.119.
 
-Lagesen, K. et al., 2007. RNAmmer: consistent and rapid annotation of ribosomal RNA genes. Nucleic acids research, 35(9), pp.3100–8.
+* Lagesen, K. et al., 2007. RNAmmer: consistent and rapid annotation of ribosomal RNA genes. Nucleic acids research, 35(9), pp.3100–8.
 
-Laslett, D., 2004. ARAGORN, a program to detect tRNA genes and tmRNA genes in nucleotide sequences. Nucleic Acids Research, 32(1), pp.11–16.
+* Laslett, D., 2004. ARAGORN, a program to detect tRNA genes and tmRNA genes in nucleotide sequences. Nucleic Acids Research, 32(1), pp.11–16.
 
-Li, W. & Godzik, A., 2006. Cd-hit: a fast program for clustering and comparing large sets of protein or nucleotide sequences. Bioinformatics (Oxford, England), 22(13), pp.1658–9.
+* Li, W. & Godzik, A., 2006. Cd-hit: a fast program for clustering and comparing large sets of protein or nucleotide sequences. Bioinformatics (Oxford, England), 22(13), pp.1658–9.
 
-Lowe, T.M. & Eddy, S.R., 1997. tRNAscan-SE: a program for improved detection of transfer RNA genes in genomic sequence. Nucleic acids research, 25(5), pp.955–64.
+* Lowe, T.M. & Eddy, S.R., 1997. tRNAscan-SE: a program for improved detection of transfer RNA genes in genomic sequence. Nucleic acids research, 25(5), pp.955–64.
 
-Nawrocki, E.P., Kolbe, D.L. & Eddy, S.R., 2009. Infernal 1.0: inference of RNA alignments. Bioinformatics (Oxford, England), 25(10), pp.1335–7.
+* Nawrocki, E.P., Kolbe, D.L. & Eddy, S.R., 2009. Infernal 1.0: inference of RNA alignments. Bioinformatics (Oxford, England), 25(10), pp.1335–7.
