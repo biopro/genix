@@ -35,3 +35,11 @@ correctly specified. Check if the binaries Prodigal (“bin/prodigal/”), Arago
 ## Webserver
 
 Genix is also available as an webserver through the URL [http://labbioinfo.ufpel.edu.br/genix](http://labbioinfo.ufpel.edu.br/genix).
+
+##  Contact and Feedback
+
+In case of any problem, or if you have any idea to improve the pipeline, please, contact us!
+Frederico Schmitt Kremer,
+fred.s.kremer@gmail.com / fredericok.cdtec@ufpel.edu.br
+Luciano da Silva Pinto,
+dmpluc@ufpel.edu.br / ls_pinto@hotmail.com
