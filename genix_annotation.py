@@ -5,7 +5,7 @@ print '''
 #////////// Genix Annotation //////////////////////////////#
 # An automated pipeline for bacterial genome annotation    #
 # Version: 0.4                                             #
-# Reference: KREMER et al, 2016                            # 
+# Reference: KREMER et al, 2016                            #
 ############################################################
 '''
 
@@ -65,7 +65,6 @@ except:
 
 # pega o local do script
 
-USEARCH_PATH = '/usr/local/bin/usearch'
 PERL_PATH = '/usr/bin/perl'
 PYTHON_PATH = '/usr/bin/python'
 RNAMMER_PATH = '/home/cdtec/Frederico/programas/RNAmmer/rnammer'
@@ -82,7 +81,7 @@ def format_sequence(sequence):
 	temp_seq.write('>1\n'+sequence)
 	temp_seq.close()
 	global script_location
-	os.system(('{1} {0}/genbank_sequence_format.pl temp_seq_file.txt '
+	os.system(('{1} {0}/scripts/genbank_sequence_format.pl temp_seq_file.txt '
 	           ' temp_out_file.txt').format(script_location,PERL_PATH))
 
 	resultado = open('temp_out_file.txt').read()
@@ -106,36 +105,30 @@ def process_fasta(sequence):
 	return processed
 
 def extend_cds(prodigal_gene,scaffold,limit):
-
 	global start_codons
 	global stop_codons
 
-	new_prodigal_gene = prodigal_gene
+	new_prodigal_gene = list(prodigal_gene)
 
 	if prodigal_gene[4] == '+':
-
 		old_start = prodigal_gene[2]
 		new_start = old_start
 		stop  = prodigal_gene[3]
 		stop_codon = scaffold[2][prodigal_gene[3]-1:prodigal_gene[3]+2]
 
 		while new_start >= limit:
-
 			new_start -= 3
 
 			new_start_codon = scaffold[2][new_start-1:new_start+2]
 			old_start_codon = scaffold[2][old_start-1:old_start+2]
 
 			if new_start_codon in stop_codons:
-
 				break
 
 			new_prodigal_gene_sequence = scaffold[2][new_start-1:prodigal_gene[3]]
 
-			if new_start_codon in start_codons and not re.match("[ACTG]+?N+?[ACTG]+?",
-				                                                new_prodigal_gene_sequence):
+			if new_start_codon in start_codons and not re.match("(.+?)?N+(.+?)?",new_prodigal_gene_sequence):
 				new_prodigal_gene[2] = int(new_start)
-
 				yield new_prodigal_gene
 
 			else:
@@ -172,15 +165,14 @@ def extend_cds(prodigal_gene,scaffold,limit):
 
 				pass
 
-
 def reduce_cds(prodigal_gene,scaffold,limit=0):
-
-	limit=prodigal_gene[3]
-
+	global database_connection
+	global database_cursor
+	limit=prodigal_gene[3] if prodigal_gene[4] == '+' else prodigal_gene[2]
 	global start_codons
 	global stop_codons
 
-	new_prodigal_gene = prodigal_gene
+	new_prodigal_gene = list(prodigal_gene)
 
 	if prodigal_gene[4] == '+':
 
@@ -195,11 +187,10 @@ def reduce_cds(prodigal_gene,scaffold,limit=0):
 
 			new_start_codon = scaffold[2][new_start-1:new_start+2]
 			old_start_codon = scaffold[2][old_start-1:old_start+2]
-
 			new_prodigal_gene_sequence = scaffold[2][new_start-1:prodigal_gene[3]]
 
 			if new_start_codon in start_codons and not re.match("[ACTG]+?N+?[ACTG]+?",
-				                                                new_prodigal_gene_sequence):
+				                                                 new_prodigal_gene_sequence):
 				new_prodigal_gene[2] = int(new_start)
 
 				yield new_prodigal_gene
@@ -568,7 +559,7 @@ for line in prodigal_output:
 			                      prodigal_gene_end,prodigal_gene_strand))
 		database_connection.commit()
 
-os.remove('%s/prodigal_genes.sco'%arguments.output_dir)
+#os.remove('%s/prodigal_genes.sco'%arguments.output_dir)
 
 #  -----------------------------------------------------------------------------
 #  RUN tRNAscan-SE
@@ -839,7 +830,8 @@ for sequence_entry in sequence_entries:
 
 					adicionar_record = True
 
-					break
+				break
+
 
 			if adicionar_record:
 
@@ -881,8 +873,8 @@ for sequence_entry in sequence_entries:
 
 					if infernal_line[9] == '+':
 
-						database_cursor.execute("INSERT INTO infernal VALUES \
-							                    (NULL,?,?,?,?,?)",
+						database_cursor.execute("""INSERT INTO infernal VALUES
+							                    (NULL,?,?,?,?,?)""",
 							                    (sequence_entry[0],
 							                    infernal_line[7],
 							                    infernal_line[8],
@@ -891,8 +883,8 @@ for sequence_entry in sequence_entries:
 
 					else:
 
-						database_cursor.execute("INSERT INTO infernal VALUES \
-							                     (NULL,?,?,?,?,?)",
+						database_cursor.execute("""INSERT INTO infernal VALUES
+							                     (NULL,?,?,?,?,?)""",
 							                     (sequence_entry[0],
 							                      infernal_line[8],
 							                      infernal_line[7],
@@ -995,8 +987,8 @@ for sequence_entry in sequence_entries:
 			has_hit = False
 
 			try:
-                                parser_blast_out = NCBIXML.parse(open('{0}/temp.xml'.format(
-                                                             arguments.output_dir)))
+				parser_blast_out = NCBIXML.parse(open('{0}/temp.xml'.format(
+                                                 arguments.output_dir)))
 				for record in parser_blast_out:
 
 					for alignment in record.alignments:
@@ -1048,10 +1040,7 @@ for sequence_entry in sequence_entries:
 				                                 blast_hit_q_len,blast_hit_s_start,
 				                                 blast_hit_s_end,blast_hit_s_len,
 						                         blast_evalue,hit_evidence,0,hit_uniprot_id))
-		'''
-		if arguments.search_program == 'USEARCH':
-			#
-		'''
+
 		database_connection.commit()
 
         try:
@@ -1097,10 +1086,9 @@ for orf in entries:
 
 		if resultado_blast[0][2] != 'No Hit':
 
-			if resultado_antifam[2] == 'True':
-				database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
-					                    (orf[1],orf[2],orf[3],orf[-1],'orf',orf[0],resultado_antifam[2]))
-				database_connection.commit()
+			database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
+					               (orf[1],orf[2],orf[3],orf[-1],'orf',orf[0],resultado_antifam[2]))
+			database_connection.commit()
 
 database_cursor.execute('SELECT * FROM trnascan')
 entries = database_cursor.fetchall()
@@ -1150,165 +1138,145 @@ sys.stdout.write('[Final processing]: Correcting start positions.\n')
 database_cursor.execute('SELECT * FROM sequences')
 sequencias = database_cursor.fetchall()
 
-for sequencia in sequencias:
+# Iterate all sequences
 
+for sequencia in sequencias:
 	database_cursor.execute('SELECT * FROM prodigal WHERE sequence_id = %s'%sequencia[0])
 	prodigal_genes = database_cursor.fetchall()
 
+	# iterate all prodigal genes predicted in the given sequence
+
 	for prodigal_gene_index, prodigal_gene in enumerate(prodigal_genes):
+		corrected = False
+		database_cursor.execute('SELECT * FROM raw_features WHERE start <= "{0}"'.format(prodigal_gene[2]))
+		database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id = "{0}"'.format(prodigal_gene[0]))
+		blast_hits = [(blast_hit[3],blast_hit[6],blast_hit[10]) for blast_hit in database_cursor.fetchall()]
+		blast_hits_query = sorted(blast_hits,
+		                          key=lambda hit:[
+								             	blast_hit[0] for blast_hit in blast_hits
+											 ].count(hit[0]))[::-1][0:5]
+		blast_hits_hit = sorted(blast_hits,
+		                          key=lambda hit:[
+								                blast_hit[0] for blast_hit in blast_hits
+										     ].count(hit[1]))[::-1][0:5]
 
-		first_gene = True if prodigal_gene_index == 0 else False
-		last_gene = True if prodigal_gene_index == len(prodigal_genes)-1 else False
+		# correct the gene if it has a hit on antifam
 
-		if prodigal_gene[4] == '+':
-
-			database_cursor.execute("SELECT * FROM raw_features WHERE start < %s"%prodigal_gene[2])
-			previous_feature = database_cursor.fetchall()
-
-			if previous_feature:
-
-				extend_cds_limit = previous_feature[-1][2]-10
-
-			else:
-
-				extend_cds_limit = 0
-
-
-		else:
-
-			database_cursor.execute("SELECT * FROM raw_features WHERE start > %s"%prodigal_gene[2])
-			next_feature = database_cursor.fetchall()
-
-			if next_feature:
-
-				extend_cds_limit = next_feature[0][2]+10
-
-			else:
-
-				extend_cds_limit = len(sequencia[2])
-
-		database_cursor.execute("SELECT * FROM blast_hits WHERE prodigal_id = %s"%(prodigal_gene[0]))
-		blast_results = database_cursor.fetchall()
-
-		for blast_result in blast_results:
-
-			if blast_result[2] != 'No Hit':
-
-				gene_coverage = float(blast_result[4]-blast_result[3]+1)/float(blast_result[8])
-
-				break
-
-		else:
-
-			break
-
-		prodigal_gene_seq = sequencia[2][prodigal_gene[2]-1:prodigal_gene[3]]
-		prodigal_fasta = open('{0}/temp.fasta'.format(abs_output_dir),'w')
-		prodigal_fasta.write(prodigal_gene_seq)
-		prodigal_fasta.close()
-
-		subprocess.call('{0}/bin/ncbi-blast/blastx -query {1}/temp.fasta -db {2} -outfmt 5 -out {1}/temp.xml -num_threads {3}'.format(
-		        		script_location, arguments.output_dir, arguments.protein_database, arguments.threads),shell=True)
-		new_blast_output = NCBIXML.parse(open("{0}/temp.xml".format(arguments.output_dir)))
-
-		for record in new_blast_output:
-
-			hsp = record.alignments[0].hsps[0]
-			hit_cover = float((hsp.sbjct_end - hsp.sbjct_start) + 1)/(record.alignments[0].length)
-			query_cover = float((hsp.query_end - hsp.query_start) + 1)/(record.query_length)
-			p_existence = int(record.alignments[0].title.split('PE=')[1].split(' ')[0])
-			break
-
-		if blast_result[2] > 1:
-
-			for new_prodigal_gene in reduce_cds(list(prodigal_gene),sequencia,extend_cds_limit):
-
-
-				new_prodigal_gene_seq = sequencia[2][new_prodigal_gene[2]-1:new_prodigal_gene[3]]
-				new_prodigal_fasta = open('{0}/temp.fasta'.format(abs_output_dir),'w')
-				new_prodigal_fasta.write(new_prodigal_gene_seq)
-				new_prodigal_fasta.close()
-
-				subprocess.call('{0}/bin/ncbi-blast/blastx -query {1}/temp.fasta -db {2} -outfmt 5 -out {1}/temp.xml -num_threads {3}'.format(
-					script_location, arguments.output_dir, arguments.protein_database, arguments.threads),shell=True)
-				new_blast_output = NCBIXML.parse(open("{0}/temp.xml".format(arguments.output_dir)))
-				try:
-					for record in new_blast_output:
-
-						hsp = record.alignments[0].hsps[0]
-
-						new_hit_cover = float((hsp.sbjct_end - hsp.sbjct_start) + 1)/(record.alignments[0].length)
-						new_query_cover = float((hsp.query_end - hsp.query_start) + 1)/(record.query_length)
-						new_p_existence = int(record.alignments[0].title.split('PE=')[1].split(' ')[0])
-				except:
-					continue
-
-					break
-
-				#subprocess.call()
-
-				if all([(new_query_cover > query_cover), (new_hit_cover > hit_cover),
-					   (p_existence >= new_p_existence)]):
-					prodigal_gene = new_prodigal_gene
-
-				else:
-
-					break
-
-		if blast_result[6] > 1:
-
-			for new_prodigal_gene in extend_cds(list(prodigal_gene),sequencia,extend_cds_limit):
-
-				new_prodigal_gene_seq = sequencia[2][new_prodigal_gene[2]-1:new_prodigal_gene[3]]
-				new_prodigal_fasta = open('{0}/temp.fasta'.format(abs_output_dir),'w')
-				if prodigal_gene[4] == '+':
-					new_prodigal_fasta.write('>1\n'+str(translate(new_prodigal_gene_seq)))
-				else:
-					new_prodigal_fasta.write('>1\n'+str(translate(reverse_complement(new_prodigal_gene_seq))))
-				print '>1\n'+str(translate(new_prodigal_gene_seq))
-				new_prodigal_fasta.close()
-				subprocess.call('{0}/bin/ncbi-blast/blastp -query {1}/temp.fasta -db {2} -outfmt 5 -out {1}/temp.xml -num_threads {3}'.format(
-					script_location, arguments.output_dir, arguments.protein_database, arguments.threads),shell=True,stdout=devnull,stderr=devnull)
-				new_blast_output = NCBIXML.parse(open("{0}/temp.xml".format(arguments.output_dir)))
-				new_antifam_hit = False
-				subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
-			           '-o {2}/temp_hmmer.txt {0}/databases/antifam/AntiFam.hmm '
-			           '{2}/temp.fasta').format(script_location,
-			           arguments.threads,arguments.output_dir),
-			           shell=True,
-			           stdout=devnull,
-			           stderr=devnull)
-				antifam_output = SearchIO.parse('%s/temp_hmmer.txt'%arguments.output_dir,
-					                            'hmmer3-text')
-				try:
+		database_cursor.execute("SELECT * FROM raw_features WHERE data_id=%s AND type = 'orf'"%(prodigal_gene[0]))
+		feature_data =  database_cursor.fetchone()
+		if feature_data:
+			if feature_data != 'False':
+				for shorter_gene in reduce_cds(prodigal_gene,sequencia):
+					if prodigal_gene[4] == '+':
+						shorter_protein = Seq(sequencia[2][shorter_gene[2]-1:shorter_gene[3]]).translate()
+					if prodigal_gene[4] == '-':
+						shorter_protein = Seq(str(Seq(sequencia[2][shorter_gene[2]-1:shorter_gene[3]]).reverse_complement())).translate()
+					temp_fasta = open('%s/temp.fasta'%arguments.output_dir,'w')
+					temp_fasta.write(">{0} {1}\n{2}\n".format(prodigal_gene, shorter_gene,shorter_protein))
+					temp_fasta.close()
+					subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
+				   '-o {2}/temp.fasta {0}/databases/antifam/AntiFam.hmm '
+				   '{2}/temp.fasta').format(script_location,
+				   	arguments.threads,arguments.output_dir),
+				   	shell=True,
+				   	stdout=devnull,
+				   	stderr=devnull)
+					antifam_hit = False
+					antifam_output = SearchIO.parse('%s/temp.fasta'%arguments.output_dir,'hmmer3-text')
 					for resultado in antifam_output:
 						for hsp in resultado.hsps:
-							if hsp.evalue <=  arguments.antifam_evalue:
-								new_antifam_hit = True
-				except:
-					pass
-				try:
-					for record in new_blast_output:
-						if not record.alignments:
-							continue
-						hsp = record.alignments[0].hsps[0]
-						new_hit_cover = float((hsp.sbjct_end - hsp.sbjct_start) + 1)/(record.alignments[0].length)
-						new_query_cover = float((hsp.query_end - hsp.query_start) + 1)/(record.query_length)
+							if hsp.evalue <= arguments.antifam_evalue:
+								antifam_hit = True
+					if not antifam_hit:
 						break
-				except:
-					continue
-
-				if new_query_cover >= query_cover and new_hit_cover >= hit_cover and new_antifam_hit == False:
-
-					prodigal_gene = new_prodigal_gene
-					database_cursor.execute("""UPDATE raw_features SET start={0},end={1}
-			                       WHERE type='orf' AND data_id={2}""".format(prodigal_gene[2],prodigal_gene[3],
-			                    	                                          prodigal_gene[0]))
-					database_connection.commit()
-
-				else:
+				if not antifam_hit:
+					corrected = True
+					if prodigal_gene[4] == '+':
+						database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
+					if prodigal_gene[4] == '-':
+						database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
 
 					break
+
+		# Reduce gene by shifting the 5' terminus
+
+		if blast_hits_query[0][0] > 1:
+			closest_gene = prodigal_gene
+			closest_distance = blast_hits_query[0][0]
+			for shorter_gene in reduce_cds(prodigal_gene,sequencia):
+				protein_reduction = abs(float((prodigal_gene[3] - prodigal_gene[2] + 1) \
+				                        - (shorter_gene[3] - shorter_gene[2] + 1)) / 3)
+				distance = abs(blast_hits_query[0][0] - protein_reduction)
+				if distance < closest_distance:
+					closest_distance = distance
+					closest_gene = shorter_gene
+				else:
+					break
+
+
+		if prodigal_gene[4] == '+':
+			database_cursor.execute('SELECT * FROM raw_features WHERE start < %s ORDER BY start'%(prodigal_gene[2]))
+			downtream_features = database_cursor.fetchall()
+			if downtream_features:
+				extension_limit = downtream_features[-1][2]
+			else:
+				extension_limit = 1
+
+		if prodigal_gene[4] == '-':
+			database_cursor.execute('SELECT * FROM raw_features WHERE start > %s ORDER BY start'%(prodigal_gene[3]))
+			downtream_features = database_cursor.fetchall()
+			if downtream_features:
+				extension_limit = downtream_features[0][2]
+			else:
+				extension_limit = len(sequencia[2])
+
+		if not corrected and blast_hits_query[0][1] > 1:
+			closest_gene = prodigal_gene
+			closest_distance = blast_hits_query[0][0]
+			initial_distance = closest_distance
+			for longer_gene in extend_cds(prodigal_gene,sequencia,extension_limit):
+				protein_reduction = abs(float((prodigal_gene[3] - prodigal_gene[2] + 1) \
+				                             - (shorter_gene[3] - shorter_gene[2] + 1)) / 3)
+				distance = abs(blast_hits_query[0][0] - protein_reduction)
+				if distance < closest_distance:
+					closest_distance = distance
+					closest_gene = shorter_gene
+				else:
+					break
+
+			if initial_distance > closest_distance:
+				pass
+		if not corrected and blast_hits_hit[0][1]:
+			closest_gene = prodigal_gene
+			closest_distance = blast_hits_hit[0][0]
+			initial_distance = closest_distance
+			antifam_hit = False
+			for extended_gene in extend_cds(prodigal_gene,sequencia,limit=extension_limit):
+				if prodigal_gene[4] == '+':
+					extended_protein = Seq(sequencia[2][extended_gene[2]-1:extended_gene[3]]).translate()
+				if prodigal_gene[4] == '-':
+					extended_protein = Seq(str(Seq(sequencia[2][extended_gene[2]-1:extended_gene[3]]).reverse_complement())).translate()
+				temp_fasta = open('%s/temp.fasta'%arguments.output_dir,'w')
+				temp_fasta.write(">{0} {1}\n{2}\n".format(prodigal_gene, extended_gene,extended_protein))
+				temp_fasta.close()
+				subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
+					           '-o {2}/temp.fasta {0}/databases/antifam/AntiFam.hmm '
+					           '{2}/temp.fasta').format(script_location,
+					           arguments.threads,arguments.output_dir),
+					           shell=True,
+					           stdout=devnull,
+					           stderr=devnull)
+				antifam_output = SearchIO.parse('%s/temp.fasta'%arguments.output_dir,
+					                            'hmmer3-text')
+				for resultado in antifam_output:
+					for hsp in resultado.hsps:
+						if hsp.evalue <= arguments.antifam_evalue:
+							antifam_hit = True
+				if not antifam_hit:
+					database_cursor.execute("UPDATE raw_features SET spurious='True' WHERE data_id=%s"%(prodigal_gene[0]))
+					break
+
+
 
 #  -----------------------------------------------------------------------------
 #  Identify frameshifted genes
@@ -1379,14 +1347,12 @@ for sequence in sequences:
 			for non_orf_feature in non_orf_features:
 
 				antisense_rna = False
-
 				if non_orf_feature[5] == 'ncrna':
 
 					database_cursor.execute('SELECT * FROM infernal where id = %s'%(non_orf_feature[6]))
 					non_orf_infernal_data = database_cursor.fetchone()
 
 					if non_orf_infernal_data:
-
 						database_cursor.execute('SELECT rfam_class FROM rfam where rfam_id = "%s"'%non_orf_infernal_data[-1])
 						rfam_data = database_cursor.fetchone()
 
@@ -1400,9 +1366,24 @@ for sequence in sequences:
 				non_orf_feature_range = set(range(non_orf_feature[2],non_orf_feature[3]+1))
 				intersection = orf_feature_range.intersection(non_orf_feature_range)
 
-				if len(intersection) > 10 and antisense_rna == False:
+				if len(intersection) >= 3 and antisense_rna == False:
 
-					break
+					database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id={0}'.format(orf_feature[6]))
+					hits = database_cursor.fetchall()
+					database_cursor.execute("SELECT * FROM prodigal WHERE ID=%s"%orf_feature[6])
+					prodigal_gene = database_cursor.fetchone()
+					
+					for shorter_gene in reduce_cds(prodigal_gene,sequence):
+						new_orf_feature_range = set(range(shorter_gene[2],shorter_gene[3]+1))
+						intersection = new_orf_feature_range.intersection(non_orf_feature_range)
+						if not intersection:
+							database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id={0}'.format(orf_feature[6]))
+							hits = database_cursor.fetchall()
+							break
+					
+					#else:
+					#
+					#	break
 
 			else:
 
