@@ -22,6 +22,8 @@ cds_count = 0
 
 for record in genbankParser:
 	for feature in record.features:
+		if not feature:
+			continue
 		if feature.type == 'gene':
 			locus_tag = 'NO_LOCUS_TAG'
 			if 'locus_tag' in feature.qualifiers.keys():

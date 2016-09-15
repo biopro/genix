@@ -19,6 +19,8 @@ count = 0
 for record in SeqIO.parse(open(sys.argv[1]),'genbank'):
 	count += 1
 	for feature in record.features:
+		if not feature:
+			continue
 		if feature.type == 'source':
 			continue
 		seqid = record.name

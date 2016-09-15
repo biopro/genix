@@ -22,6 +22,8 @@ cds_count = 0
 
 for record in genbankParser:
 	for feature in record.features:
+		if not feature:
+			continue
 		if feature.type == 'source':
 			continue
 		if feature.type == 'CDS':
