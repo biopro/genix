@@ -2,7 +2,12 @@ import sys
 import csv
 import re
 import commands
+import multiprocessing
 from Bio import SeqIO
+
+uniprot_dict = {}
+final_list = []
+prefix = sys.argv[1]
 
 def get_clusters_cdhit(prefix):
 	cluster_list = []
@@ -26,41 +31,45 @@ def get_clusters_cdhit(prefix):
 		cluster_list.append(cluster_current)
 	return cluster_list
 
-def refine_clusters(cluster_list,prefix):
-	final_list = []
-	csv_parser = csv.reader(open('{0}_raw.tab'.format(prefix)),delimiter='\t')
-	uniprot_dict = {}
-	for linha_i, linha_data in enumerate(csv_parser):
-		if linha_i:
-			pass
+def iterate_cluster(cluster):
+	best_annotation = None
+	global uniprot_dict
+	global final_list
+	for member in reversed(sorted(cluster,key=lambda member:member[2])):
+		if not best_annotation:
+			best_annotation = member
 		else:
-			continue
-		uniprot_dict[linha_data[0]] = (linha_data[2], linha_data[1], linha_data[3], int(linha_data[4].split(' ')[0]))
-		#print uniprot_dict
-	for cluster in cluster_list:
-		best_annotation = None
-		for member in reversed(sorted(cluster,key=lambda member:member[2])):
-			if not best_annotation:
+			if uniprot_dict[member[1]][1] == 'reviewed' and uniprot_dict[best_annotation[1]][1] == 'unreviewed':
 				best_annotation = member
-			else:
-				if uniprot_dict[member[1]][1] == 'reviewed' and uniprot_dict[best_annotation[1]][1] == 'unreviewed':
-					best_annotation = member
-				if uniprot_dict[member[1]][3] > uniprot_dict[best_annotation[1]][3]:
-					best_annotation = member
-		final_list.append(best_annotation[1])
-	return final_list
+			if uniprot_dict[member[1]][3] > uniprot_dict[best_annotation[1]][3]:
+				best_annotation = member
+	return best_annotation[1]
+
+csv_parser = csv.reader(open('{0}_raw.tab'.format(prefix)),delimiter='\t')
+
+for linha_i, linha_data in enumerate(csv_parser):
+	if linha_i:
+		pass
+	else:
+		continue
+	uniprot_dict[linha_data[0]] = (linha_data[2], linha_data[1], linha_data[3], int(linha_data[4].split(' ')[0]))
 		
-prefix = sys.argv[1]
 lista = get_clusters_cdhit(prefix)
 
-refined_list = refine_clusters(lista,prefix)
+pool = multiprocessing.Pool(4)
+ids = [id for id in pool.map(iterate_cluster,lista)]
+
+def check_if_representative(entry):
+	global ids
+	if entry:
+		if entry.id.split('|')[1] in ids:
+			return entry
+
+pool = multiprocessing.Pool(8)
 
 fasta_raw_handle = open('{0}_raw.fasta'.format(prefix))
 fasta_raw_parser = SeqIO.parse(fasta_raw_handle,'fasta')
-sys.stdout = open('{0}_clustered.corrected'.format(prefix),'w')
+fasta_processed  = open('{0}_clustered.corrected'.format(prefix),'w')
 
-for entry in fasta_raw_parser:
-	if entry.id.split('|')[1] in refined_list:
-		sys.stdout.write(entry.format('fasta')+'\n')
-		sys.stdout.flush()
+SeqIO.write((record for record in pool.map(check_if_representative,fasta_raw_parser) if record), fasta_processed, 'fasta')
 
