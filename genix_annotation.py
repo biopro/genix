@@ -784,7 +784,8 @@ for line in saida_aragorn.split('\n'):
 #  -----------------------------------------------------------------------------
 
 excluded_families = ['RF00177','RF02541','RF00005','RF00001','RF01959',
-                     'RF01960','RF01959','RF01960','RF01118','RF00023']
+                     'RF01960','RF01959','RF01960','RF01118','RF00023',
+                     'RF00002']
 
 sys.stdout.write('[INFERNAL]: Predicting ncRNAs.\n')
 database_cursor.execute('SELECT * FROM sequences')
