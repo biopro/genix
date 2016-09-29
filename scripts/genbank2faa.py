@@ -36,7 +36,7 @@ for record in genbankParser:
 			genbankCDSText += ('>{0}|{7}|{1}|{2}:{3}:{4}| {5}\n'
 				                   '{6}\n').format(str(cds_count),locus_tag,feature.location.start,
 					       feature.location.end,feature.location.strand,product,
-					       str(feature.location.extract(record.seq).translate()).replace('*',''),record.id)
+					       str(feature.location.extract(record.seq).translate()),record.id)
 fastaHandleOut = open(sys.argv[2],'w')
 fastaHandleOut.write(genbankCDSText)
 fastaHandleOut.close()

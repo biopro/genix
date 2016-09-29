@@ -503,7 +503,7 @@ for sequence_entry in database_cursor.execute('SELECT * FROM sequences'):
 
 			database_cursor.execute("INSERT INTO gaps VALUES (NULL,?,?,?)",
 				                     (sequence_id,pattern_start,pattern_end))
-			database_connection.commit()
+database_connection.commit()
 
 #  -----------------------------------------------------------------------------
 #  RUN Prodigal
@@ -557,7 +557,7 @@ for line in prodigal_output:
 		database_cursor.execute("INSERT INTO prodigal VALUES (NULL,?,?,?,?)",
 			                     (sequence_id,prodigal_gene_start,
 			                      prodigal_gene_end,prodigal_gene_strand))
-		database_connection.commit()
+database_connection.commit()
 
 #os.remove('%s/prodigal_genes.sco'%arguments.output_dir)
 
@@ -644,8 +644,8 @@ for line in trnascan_output:
 				   (sequence_id,trnascan_trna_start,trnascan_trna_end,
 				    trnascan_trna_strand,trnascan_trna_anticodon,
 				    trnascan_trna_aminoacid,trnascan_trna_coven_sco))
-			database_connection.commit()
 
+database_connection.commit()
 os.remove('%s/trnascan.out'%arguments.output_dir)
 
 #  -----------------------------------------------------------------------------
@@ -720,7 +720,8 @@ if os.path.isfile(RNAMMER_PATH):
 				(rnammer_entry['sequenceEntry'],rnammer_entry['start'],
 				rnammer_entry['end'],rnammer_entry['direction'],
 				rnammer_entry['mol_def']))
-			database_connection.commit()
+
+database_connection.commit()
 
 #  -----------------------------------------------------------------------------
 #  RUN Aragorn
@@ -774,7 +775,8 @@ for line in saida_aragorn.split('\n'):
 		database_cursor.execute("INSERT INTO aragorn VALUES (NULL,?,?,?,?,?)",
 			                    (header,tm_rna_start,tm_rna_end,strand,
 								 tm_rna_peptide))
-		database_connection.commit()
+
+database_connection.commit()
 
 
 #  -----------------------------------------------------------------------------
@@ -791,6 +793,8 @@ sys.stdout.write('[INFERNAL]: Predicting ncRNAs.\n')
 database_cursor.execute('SELECT * FROM sequences')
 sequence_entries = database_cursor.fetchall()
 
+SQL_inserts_blastn = []
+
 for sequence_entry in sequence_entries:
 
 	blast_hits_accs = []
@@ -800,7 +804,7 @@ for sequence_entry in sequence_entries:
 	blast_fasta_handle.write('>%s\n%s\n'%(sequence_id,sequence))
 	blast_fasta_handle.close()
 
-	subprocess.call(('/usr/bin/blastn -query {0}/temp.fasta '
+	subprocess.call(('/usr/bin/blastn -word_size 10 -query {0}/temp.fasta '
 			            '-db {1}/databases/rfam/rfam -out {0}/temp.xml '
                                     '-num_alignments 100000 '
 			            '-outfmt 5 -num_threads {2}').format(
@@ -850,9 +854,9 @@ for sequence_entry in sequence_entries:
 	for accs in blast_hits_accs:
 
 		subprocess.call(('{0}/bin/infernal/src/cmsearch '
-			         '--tblout {1}/temp_infernal.txt '
+			         '--tblout {1}/temp_infernal.txt --rfam --cpu {3} '
 			         '{0}/databases/rfam/CMs/{2}.cm {1}/temp.fasta').format(
-			            	script_location,arguments.output_dir,accs),
+			            	script_location,arguments.output_dir,accs,arguments.threads),
 		               	shell=True,
 		               	stdout=devnull,
 		               	stderr=devnull)
@@ -891,6 +895,7 @@ for sequence_entry in sequence_entries:
 							                      infernal_line[9],
 							                      infernal_line[3]))
 
+database_connection.commit()
 #  -----------------------------------------------------------------------------
 #  RUN BLAST vs. Uniprot and HMMER vs. Antifam
 #  -----------------------------------------------------------------------------
@@ -902,8 +907,10 @@ sys.stdout.write('[Uniprot-BLAST]: Annotating proteins.\n')
 database_cursor.execute('SELECT * FROM sequences')
 sequence_entries = database_cursor.fetchall()
 
-for sequence_entry in sequence_entries:
+SQL_inserts_antifam = []
+SQL_inserts_blastp = []
 
+for sequence_entry in sequence_entries:
 	sequence = sequence_entry[2]
 	sequence_id = sequence_entry[0]
 	database_cursor.execute('SELECT * FROM prodigal \
@@ -949,10 +956,10 @@ for sequence_entry in sequence_entries:
 					prodigal_correct = 'False'
 					break
 
-		database_cursor.execute("INSERT INTO antifam VALUES (NULL,?,?)",
-			                    (prodigal_gene[0],prodigal_correct))
-
-		database_connection.commit()
+		#database_cursor.execute("INSERT INTO antifam VALUES (NULL,?,?)",
+		#	                    (prodigal_gene[0],prodigal_correct))
+		SQL_inserts_antifam.append((prodigal_gene[0],prodigal_correct))
+		#database_connection.commit()
 
 		#RUN database search
 
@@ -969,7 +976,7 @@ for sequence_entry in sequence_entries:
 
 		if arguments.search_program == 'BLAST':
 
-			subprocess.call('{0}/bin/ncbi-blast/blastp -query {1}/temp.fasta '
+			subprocess.call('{0}/bin/ncbi-blast/blastp -word_size 7 -query {1}/temp.fasta '
 				            '-db {2} -out {1}/temp.xml -outfmt 5 '
 				            '-num_threads {3}'.format(
 					            script_location,arguments.output_dir,
@@ -1016,14 +1023,19 @@ for sequence_entry in sequence_entries:
 								hit_name_name = re.split('[A-Z]+=',hit_name_name)[0].replace('[','(').replace(']',')')
 								hit_evidence = hit_name_data[-1].split(' ',1)[1].split("PE=")[1].split(' ')[0]
 
-								database_cursor.execute((
-									"INSERT INTO blast_hits VALUES "
-									"(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
-									(prodigal_gene[0],hit_name_name,
-										blast_hit_q_start,blast_hit_q_end,
-				                        blast_hit_q_len,blast_hit_s_start,
-				                        blast_hit_s_end,blast_hit_s_len,
-						                blast_evalue,hit_evidence,1,hit_uniprot_id))
+								#database_cursor.execute((
+								#	"INSERT INTO blast_hits VALUES "
+								#	"(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
+								#	(prodigal_gene[0],hit_name_name,
+								#		blast_hit_q_start,blast_hit_q_end,
+				                #        blast_hit_q_len,blast_hit_s_start,
+				                #        blast_hit_s_end,blast_hit_s_len,
+						        #        blast_evalue,hit_evidence,1,hit_uniprot_id))
+						        SQL_inserts_blastp.append((prodigal_gene[0],hit_name_name,
+										                   blast_hit_q_start,blast_hit_q_end,
+				                                           blast_hit_q_len,blast_hit_s_start,
+				                                           blast_hit_s_end,blast_hit_s_len,
+						                                   blast_evalue,hit_evidence,1,hit_uniprot_id))
 							break
 
 			except:
@@ -1033,15 +1045,18 @@ for sequence_entry in sequence_entries:
 
 			if not has_hit:
 
-						database_cursor.execute(("INSERT INTO blast_hits VALUES "
-							                    "(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
-												(prodigal_gene[0],hit_name_name,
+						#database_cursor.execute(("INSERT INTO blast_hits VALUES "
+						#	                    "(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
+						#						(prodigal_gene[0],hit_name_name,
+						#						blast_hit_q_start,blast_hit_q_end,
+				        #                         blast_hit_q_len,blast_hit_s_start,
+				        #                         blast_hit_s_end,blast_hit_s_len,
+						#                         blast_evalue,hit_evidence,0,hit_uniprot_id))
+						SQL_inserts_blastp.append((prodigal_gene[0],hit_name_name,
 												blast_hit_q_start,blast_hit_q_end,
 				                                 blast_hit_q_len,blast_hit_s_start,
 				                                 blast_hit_s_end,blast_hit_s_len,
 						                         blast_evalue,hit_evidence,0,hit_uniprot_id))
-
-		database_connection.commit()
 
         try:
 
@@ -1052,7 +1067,16 @@ for sequence_entry in sequence_entries:
         except:
 
         	pass
+database_cursor.executemany("INSERT INTO antifam VALUES (NULL,?,?)",
+		                    SQL_inserts_antifam)
 
+database_cursor.executemany(("INSERT INTO blast_hits VALUES "
+	                         "(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
+                             SQL_inserts_blastp)
+
+del SQL_inserts_antifam
+del SQL_inserts_blastp
+database_connection.commit()
 gc.collect()
 
 #  -----------------------------------------------------------------------------

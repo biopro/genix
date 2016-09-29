@@ -1,1 +1,19 @@
+############################################################
+#////////// Genix Annotation //////////////////////////////#
+# An automated pipeline for bacterial genome annotation    #
+# Version: 0.4                                             #
+# Reference: KREMER et al, 2016                            #
+############################################################
 
+DOWNLOADING:
+
+# install dependences
+
+$ sudo apt-get install python-biopython
+$ sudo apt-get install bioperl
+$ sudo apt-get install ncbi-blast+
+
+# clone the git repository
+
+$ git clone https://github.com/fredericokremer/genix/
+$ cd genix
