@@ -46,14 +46,15 @@ wget_url='http://www.uniprot.org/uniprot/?query=taxonomy:'$1'+NOT+name:ORF+NOT+n
 wget_url='http://www.uniprot.org/uniprot/?query=taxonomy:'$1'+NOT+name:ORF+NOT+name:contig+NOT+name:scaffold+NOT+name:"genome%20shotgun"+NOT+name:"DNA%20for"+NOT+name:complete+NOT+name:partial&sort=score'
 wgetoutput=$2\_raw
 
-wget -O $wgetoutput'.fasta' $wget_url'&format=fasta' 2> $2_get_database.log
-wget -O $wgetoutput'.tab' $wget_url'&format=tab&columns=id,reviewed,protein names,genes,annotation score' 2>> $2_get_database.log
+wget -O $wgetoutput'.fasta' $wget_url'&format=fasta'
+wget -O $wgetoutput'.tab' $wget_url'&format=tab&columns=id,reviewed,protein names,genes,annotation score'
 
 echo 'Running CD-HIT'
-cdhit -i $wgetoutput.fasta -c $3 -o $2\_clustered -T 8 -M 4000 #>> $2_get_database.log
+
+cd-hit -i $wgetoutput.fasta -c $3 -o $2\_clustered -T 8 -M 8000 #>> $2_get_database.log
 echo 'Refining clustering'
 python $GENIX_DIR/scripts/get_database_optimizer.py $2 cdhit #>> $2_get_database.log
 mv $2_clustered.corrected $2\_clustered
-$GENIX_DIR/bin/ncbi-blast/./makeblastdb -in $2\_clustered -dbtype prot -out $2 >> $2_get_database.log
+makeblastdb -in $2\_clustered -dbtype prot -out $2 >> $2_get_database.log
 
-rm $2\_raw.fasta
+
