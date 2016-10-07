@@ -1,2 +1,21 @@
-GENIX:
+############################################################
+#////////// Genix Annotation //////////////////////////////#
+# An automated pipeline for bacterial genome annotation    #
+# Version: 0.4                                             #
+# Reference: KREMER et al, 2016                            #
+############################################################
 
+TODOS:
+
+Although Genix is already able to generate good-quality 
+annotations for a wide variety of microbial genomes, we
+are constantly working to include new features and fix
+some issues. Here we describe some of the thinks we want
+to add in future releases ^^
+
+- Gene finding based on multiple programs.
+- Faster protein identification.
+- Better identification of frameshifted genes.
+- Add the COG database (RPS-BLAST+).
+- Add support to BLAST2GO (BLAST2G0 CLI).
+- Add support to Interproscan.

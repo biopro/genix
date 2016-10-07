@@ -51,7 +51,7 @@ wget -O $wgetoutput'.tab' $wget_url'&format=tab&columns=id,reviewed,protein name
 
 echo 'Running CD-HIT'
 
-cd-hit -i $wgetoutput.fasta -c $3 -o $2\_clustered -T 8 -M 8000 #>> $2_get_database.log
+cdhit -i $wgetoutput.fasta -c $3 -o $2\_clustered -T 8 -M 8000 #>> $2_get_database.log
 echo 'Refining clustering'
 python $GENIX_DIR/scripts/get_database_optimizer.py $2 cdhit #>> $2_get_database.log
 mv $2_clustered.corrected $2\_clustered

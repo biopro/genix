@@ -228,6 +228,66 @@ def reduce_cds(prodigal_gene,scaffold,limit=0):
 
 				pass
 
+def has_antifam_hit(gene, sequencia):
+	global arguments
+	global script_location
+	global devnull
+	if gene[4] == '+':
+		protein = translate(str(sequencia[2][gene[2]-1:gene[3]]))
+	if prodigal_gene[4] == '-':
+		protein = translate(str(reverse_complement(str(sequencia[2][gene[2]-1:gene[3]]))))
+	protein_fasta = open('{0}/temp.fasta'.format(arguments.output_dir),'w')
+	protein_fasta.write('>temp\n{0}\n'.format(protein))
+	protein_fasta.close()
+	subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
+			         '-o {2}/temp_hmmer.txt {0}/databases/antifam/AntiFam.hmm '
+			         '{2}/temp.fasta').format(script_location,
+			         arguments.threads,arguments.output_dir),
+			         shell=True,
+			         stdout=devnull,
+			         stderr=devnull)
+
+	antifam_output = SearchIO.parse('%s/temp_hmmer.txt'%arguments.output_dir,
+			                        'hmmer3-text')
+	for resultado in antifam_output:
+		for hsp in resultado.hsps:
+			if hsp.evalue <=  arguments.antifam_evalue:
+				return True
+	return False
+
+def get_coverages(gene, sequencia):
+	global arguments
+	global script_location
+	global devnull
+	closest_query_cover = 0
+	closest_hit_cover = 0
+	if gene[4] == '+':
+		closest_protein = translate(str(sequencia[2][gene[2]-1:gene[3]]))
+	if prodigal_gene[4] == '-':
+		closest_protein = translate(str(reverse_complement(str(sequencia[2][gene[2]-1:gene[3]]))))
+
+	closest_gene = gene
+	closest_distance = 0
+	protein_fasta = open('{0}/temp.fasta'.format(arguments.output_dir),'w')
+	protein_fasta.write('>temp\n{0}\n'.format(closest_protein))
+	protein_fasta.close()
+	subprocess.call('{0}/bin/ncbi-blast/blastp -word_size 7 -num_alignments 10 '
+					' -query {1}/temp.fasta -db {2} -out {1}/temp.xml -outfmt 5 '
+					'-num_threads {3}'.format(
+					script_location,arguments.output_dir,
+					arguments.protein_database,arguments.threads),
+					stdout=devnull,
+			        stderr=devnull,
+					shell=True)
+
+	blast_parser = NCBIXML.parse(open('{0}/temp.xml'.format(arguments.output_dir)))
+	blast_results = [result for result in blast_parser]
+	if blast_results[0].alignments:
+		hit = blast_results[0].alignments[0]
+		closest_query_cover = float(hit.hsps[0].query_end - hit.hsps[0].query_start + 1)/blast_results[0].query_length
+		closest_hit_cover = float(hit.hsps[0].sbjct_end - hit.hsps[0].sbjct_start + 1)/hit.length
+	return closest_query_cover, closest_hit_cover
+
 #PARSE ARGUMENTS
 
 parser = argparse.ArgumentParser()
@@ -467,24 +527,27 @@ del rfam_dados
 
 sys.stdout.write('[Indexing]: Indexing sequences.\n')
 
-for sequence in sequences:
+SQL_sequence_List = []
 
+
+for sequence_index, sequence in enumerate(sequences):
 	sequence_raw = str(sequence.seq)
 	for whitespace in string.whitespace:
-
 		sequence_raw = sequence_raw.replace(whitespace,'')
 		sequence_raw = sequence_raw.upper()
 		processed_sequence = process_fasta(sequence_raw)
+	SQL_sequence_List.append((sequence.name,processed_sequence))
 
-	database_cursor.execute("INSERT INTO sequences VALUES (NULL,?,?)",
-		(sequence.name,processed_sequence))
-
+database_cursor.executemany("INSERT INTO sequences VALUES (NULL,?,?)",SQL_sequence_List)
+del SQL_sequence_List
 del sequences
 gc.collect()
 database_connection.commit()
 
 #MAP GAPS
 sys.stdout.write('[Indexing]: Indexing gaps.\n')
+
+SQL_gap_List = []
 
 for sequence_entry in database_cursor.execute('SELECT * FROM sequences'):
 
@@ -499,11 +562,12 @@ for sequence_entry in database_cursor.execute('SELECT * FROM sequences'):
 		gap_len = len(sequence[pattern_start:pattern_end])
 
 		if gap_len >= arguments.min_gap:
+			SQL_gap_List.append((sequence_id,pattern_start,pattern_end))
 
-			database_cursor.execute("INSERT INTO gaps VALUES (NULL,?,?,?)",
-				                     (sequence_id,pattern_start,pattern_end))
-			database_connection.commit()
-
+database_cursor.executemany("INSERT INTO gaps VALUES (NULL,?,?,?)",
+				             SQL_gap_List)
+del SQL_gap_List
+database_connection.commit()
 #  -----------------------------------------------------------------------------
 #  RUN Prodigal
 #  -----------------------------------------------------------------------------
@@ -512,17 +576,16 @@ for sequence_entry in database_cursor.execute('SELECT * FROM sequences'):
 
 sys.stdout.write('[Prodigal]: Predicting CDSs.\n')
 
+SQL_orf_List = []
+
 processed_fasta_string = ''
 processed_fasta_handle = open('{0}/processed_sequences.fasta'.format(
 	                          arguments.output_dir),'w')
 
 for sequence_entry in database_cursor.execute('SELECT * FROM sequences'):
-
 	processed_fasta_string += '>%s\n%s\n'%(str(sequence_entry[0]),
 		                       sequence_entry[2])
-
 processed_fasta_handle.write(processed_fasta_string)
-processed_fasta_handle.close()
 
 prodigal_return_code = subprocess.call(('{0}/bin/prodigal/./prodigal '
 	                                    '-i {1}/processed_sequences.fasta '
@@ -533,7 +596,7 @@ prodigal_return_code = subprocess.call(('{0}/bin/prodigal/./prodigal '
                                         shell=True,
                                         stderr=devnull,
                                         stdout=devnull)
-
+                                       
 if prodigal_return_code != 0:
 
 	sys.stderr.write('ERROR: Error while running Prodigal.\n')
@@ -553,10 +616,12 @@ for line in prodigal_output:
 		prodigal_gene_start = int(prodigal_gene[1])
 		prodigal_gene_end = int(prodigal_gene[2])
 		prodigal_gene_strand = prodigal_gene[3]
-		database_cursor.execute("INSERT INTO prodigal VALUES (NULL,?,?,?,?)",
-			                     (sequence_id,prodigal_gene_start,
-			                      prodigal_gene_end,prodigal_gene_strand))
-		database_connection.commit()
+		SQL_orf_List.append((sequence_id,prodigal_gene_start,
+			                 prodigal_gene_end,prodigal_gene_strand))
+
+database_cursor.executemany("INSERT INTO prodigal VALUES (NULL,?,?,?,?)",SQL_orf_List)
+database_connection.commit()
+del SQL_orf_List
 
 #os.remove('%s/prodigal_genes.sco'%arguments.output_dir)
 
@@ -567,6 +632,8 @@ for line in prodigal_output:
 #  -----------------------------------------------------------------------------
 
 sys.stdout.write('[tRNAscan-SE]: Predicting tRNAs.\n')
+
+SQL_transcan_List = []
 
 abs_output_dir = os.path.abspath(arguments.output_dir)
 
@@ -638,13 +705,13 @@ for line in trnascan_output:
 
 		if trnascan_trna_aminoacid != 'Pseudo':
 
-			database_cursor.execute(
-				"""INSERT INTO trnascan VALUES (NULL,?,?,?,?,?,?,?)""",
-				   (sequence_id,trnascan_trna_start,trnascan_trna_end,
+			SQL_transcan_List.append((sequence_id,trnascan_trna_start,trnascan_trna_end,
 				    trnascan_trna_strand,trnascan_trna_anticodon,
 				    trnascan_trna_aminoacid,trnascan_trna_coven_sco))
-			database_connection.commit()
 
+database_cursor.executemany("""INSERT INTO trnascan VALUES (NULL,?,?,?,?,?,?,?)""",
+                        SQL_transcan_List)
+database_connection.commit()
 os.remove('%s/trnascan.out'%arguments.output_dir)
 
 #  -----------------------------------------------------------------------------
@@ -653,8 +720,9 @@ os.remove('%s/trnascan.out'%arguments.output_dir)
 #  TODO: A better parser for the RNAmmer XML. (i hate XML)#
 #  -----------------------------------------------------------------------------
 
-if os.path.isfile(RNAMMER_PATH):
+SQL_rnammer_List = []
 
+if os.path.isfile(RNAMMER_PATH):
 	sys.stdout.write('[RNAmmer]: Predicting rRNAs.\n')
 	rnammer_return_code = subprocess.call(
 		                  ('{2} {0} -S bac -m lsu,ssu,tsu -xml '
@@ -714,13 +782,14 @@ if os.path.isfile(RNAMMER_PATH):
 
 		if re.match('^.+?</entry>$',line):
 
-			database_cursor.execute(
-				"INSERT INTO rnammer VALUES (NULL,?,?,?,?,?)",
-				(rnammer_entry['sequenceEntry'],rnammer_entry['start'],
+			SQL_rnammer_List.append((rnammer_entry['sequenceEntry'],rnammer_entry['start'],
 				rnammer_entry['end'],rnammer_entry['direction'],
 				rnammer_entry['mol_def']))
-			database_connection.commit()
 
+database_cursor.executemany("INSERT INTO rnammer VALUES (NULL,?,?,?,?,?)",
+	                    SQL_rnammer_List)
+database_connection.commit()
+del SQL_rnammer_List
 #  -----------------------------------------------------------------------------
 #  RUN Aragorn
 #  -----------------------------------------------------------------------------
@@ -728,6 +797,8 @@ if os.path.isfile(RNAMMER_PATH):
 #  -----------------------------------------------------------------------------
 
 sys.stdout.write('[ARAGORN]: Predicting tmRNAs.\n')
+
+SQL_aragorn_List = []
 
 aragorn_return_code = subprocess.call(('{0}/bin/aragorn/aragorn -m -gcbact '
 	                                   '-w -o {1}/aragorn_output.txt '
@@ -770,11 +841,11 @@ for line in saida_aragorn.split('\n'):
 
 		tm_rna_start = tm_rna_location.split('[')[1].split(',')[0]
 		tm_rna_end = tm_rna_location.split(',')[1].split(']')[0]
-		database_cursor.execute("INSERT INTO aragorn VALUES (NULL,?,?,?,?,?)",
-			                    (header,tm_rna_start,tm_rna_end,strand,
+		SQL_aragorn_List.append((header,tm_rna_start,tm_rna_end,strand,
 								 tm_rna_peptide))
-		database_connection.commit()
-
+database_cursor.executemany("INSERT INTO aragorn VALUES (NULL,?,?,?,?,?)",SQL_aragorn_List)
+database_connection.commit()
+del SQL_aragorn_List
 
 #  -----------------------------------------------------------------------------
 #  RUN INFERNAL
@@ -782,17 +853,20 @@ for line in saida_aragorn.split('\n'):
 #  These families of RNAs are already predicted by other tools, which are more
 #  purpose-specific, so they are not included when found by INFERNAL.
 #  -----------------------------------------------------------------------------
-
+SQL_infernal_List = []
 excluded_families = ['RF00177','RF02541','RF00005','RF00001','RF01959',
                      'RF01960','RF01959','RF01960','RF01118','RF00023',
                      'RF00002']
 
 sys.stdout.write('[INFERNAL]: Predicting ncRNAs.\n')
+
+SQL_infernal_List = []
 database_cursor.execute('SELECT * FROM sequences')
 sequence_entries = database_cursor.fetchall()
 
 for sequence_entry in sequence_entries:
-
+	if not sequence_entry[2]:
+		continue
 	blast_hits_accs = []
 	sequence = sequence_entry[2]
 	sequence_id = sequence_entry[0]
@@ -802,7 +876,7 @@ for sequence_entry in sequence_entries:
 
 	subprocess.call(('/usr/bin/blastn -query {0}/temp.fasta '
 			            '-db {1}/databases/rfam/rfam -out {0}/temp.xml '
-                                    '-num_alignments 100000 '
+                                    '-num_alignments 1000000 '
 			            '-outfmt 5 -num_threads {2}').format(
 			            	arguments.output_dir,script_location,
 			            	arguments.threads),
@@ -872,25 +946,21 @@ for sequence_entry in sequence_entries:
 				if float(infernal_line[15]) <= arguments.infernal_evalue:
 
 					if infernal_line[9] == '+':
-
-						database_cursor.execute("""INSERT INTO infernal VALUES
-							                    (NULL,?,?,?,?,?)""",
-							                    (sequence_entry[0],
+						SQL_infernal_List.append((sequence_entry[0],
 							                    infernal_line[7],
 							                    infernal_line[8],
 							                    infernal_line[9],
 							                    infernal_line[3]))
-
 					else:
-
-						database_cursor.execute("""INSERT INTO infernal VALUES
-							                     (NULL,?,?,?,?,?)""",
-							                     (sequence_entry[0],
+						SQL_infernal_List.append((sequence_entry[0],
 							                      infernal_line[8],
 							                      infernal_line[7],
 							                      infernal_line[9],
 							                      infernal_line[3]))
-
+database_cursor.executemany("""INSERT INTO infernal VALUES
+					    (NULL,?,?,?,?,?)""",SQL_infernal_List)
+database_connection.commit()
+del SQL_infernal_List
 #  -----------------------------------------------------------------------------
 #  RUN BLAST vs. Uniprot and HMMER vs. Antifam
 #  -----------------------------------------------------------------------------
@@ -901,13 +971,19 @@ for sequence_entry in sequence_entries:
 sys.stdout.write('[Uniprot-BLAST]: Annotating proteins.\n')
 database_cursor.execute('SELECT * FROM sequences')
 sequence_entries = database_cursor.fetchall()
+SQL_antifam_List = []
+SQL_blastp_List = []
+
+if not os.path.isdir("{0}/blastp_xml/".format(arguments.output_dir)):
+	os.mkdir("{0}/blastp_xml/".format(arguments.output_dir))
+else:
+	os.system("rm -r {0}/blastp_xml/*".format(arguments.output_dir))
 
 for sequence_entry in sequence_entries:
 
 	sequence = sequence_entry[2]
 	sequence_id = sequence_entry[0]
-	database_cursor.execute('SELECT * FROM prodigal \
-		                     WHERE sequence_id = {0}'.format(sequence_id))
+	database_cursor.execute('SELECT * FROM prodigal WHERE sequence_id = {0}'.format(sequence_id))
 
 	prodigal_genes = database_cursor.fetchall()
 
@@ -945,14 +1021,9 @@ for sequence_entry in sequence_entries:
 			for hsp in resultado.hsps:
 
 				if hsp.evalue <=  arguments.antifam_evalue:
-
 					prodigal_correct = 'False'
 					break
-
-		database_cursor.execute("INSERT INTO antifam VALUES (NULL,?,?)",
-			                    (prodigal_gene[0],prodigal_correct))
-
-		database_connection.commit()
+		SQL_antifam_List.append((prodigal_gene[0],prodigal_correct))
 
 		#RUN database search
 
@@ -968,13 +1039,14 @@ for sequence_entry in sequence_entries:
 		hit_evidence = 'No'
 
 		if arguments.search_program == 'BLAST':
-
-			subprocess.call('{0}/bin/ncbi-blast/blastp -word_size 7 -query {1}/temp.fasta '
-				            '-db {2} -out {1}/temp.xml -outfmt 5 '
+			
+			subprocess.call('{0}/bin/ncbi-blast/blastp -word_size 7 -num_alignments 10 '
+				            ' -query {1}/temp.fasta -db {2} -out {1}/blastp_xml/{4}.xml -outfmt 5 '
 				            '-num_threads {3}'.format(
 					            script_location,arguments.output_dir,
-					            arguments.protein_database,arguments.threads),
+					            arguments.protein_database,arguments.threads,prodigal_gene[0]),
 				            shell=True)
+			
 			hit_name_name = 'No Hit'
 			hit_uniprot_id = ''
 			blast_hit_q_start = 0
@@ -987,8 +1059,8 @@ for sequence_entry in sequence_entries:
 			has_hit = False
 
 			try:
-				parser_blast_out = NCBIXML.parse(open('{0}/temp.xml'.format(
-                                                 arguments.output_dir)))
+				parser_blast_out = NCBIXML.parse(open('{0}/blastp_xml/{1}.xml'.format(
+                                                 arguments.output_dir,prodigal_gene[0])))
 				for record in parser_blast_out:
 
 					for alignment in record.alignments:
@@ -1015,16 +1087,12 @@ for sequence_entry in sequence_entries:
 								hit_name_name = hit_name_data[-1].split(' ',1)[1]
 								hit_name_name = re.split('[A-Z]+=',hit_name_name)[0].replace('[','(').replace(']',')')
 								hit_evidence = hit_name_data[-1].split(' ',1)[1].split("PE=")[1].split(' ')[0]
-
-								database_cursor.execute((
-									"INSERT INTO blast_hits VALUES "
-									"(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
-									(prodigal_gene[0],hit_name_name,
+								SQL_blastp_List.append((prodigal_gene[0],hit_name_name,
 										blast_hit_q_start,blast_hit_q_end,
 				                        blast_hit_q_len,blast_hit_s_start,
 				                        blast_hit_s_end,blast_hit_s_len,
 						                blast_evalue,hit_evidence,1,hit_uniprot_id))
-							break
+								break
 
 			except:
 
@@ -1032,15 +1100,13 @@ for sequence_entry in sequence_entries:
 				continue
 
 			if not has_hit:
-
-						database_cursor.execute(("INSERT INTO blast_hits VALUES "
-							                    "(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
-												(prodigal_gene[0],hit_name_name,
-												blast_hit_q_start,blast_hit_q_end,
-				                                 blast_hit_q_len,blast_hit_s_start,
-				                                 blast_hit_s_end,blast_hit_s_len,
-						                         blast_evalue,hit_evidence,0,hit_uniprot_id))
-
+				database_cursor.execute(("INSERT INTO blast_hits VALUES "
+							             "(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),
+										  (prodigal_gene[0],hit_name_name,
+										   blast_hit_q_start,blast_hit_q_end,
+				                           blast_hit_q_len,blast_hit_s_start,
+				                           blast_hit_s_end,blast_hit_s_len,
+						                    blast_evalue,hit_evidence,0,hit_uniprot_id))
 		database_connection.commit()
 
         try:
@@ -1052,6 +1118,11 @@ for sequence_entry in sequence_entries:
         except:
 
         	pass
+database_cursor.executemany("INSERT INTO antifam VALUES (NULL,?,?)",SQL_antifam_List)
+database_cursor.executemany(("INSERT INTO blast_hits VALUES "
+							 "(NULL,?,?,?,?,?,?,?,?,?,?,?,?)"),SQL_blastp_List)
+del SQL_antifam_List
+del SQL_blastp_List
 
 gc.collect()
 
@@ -1075,25 +1146,23 @@ for gap in entries:
 database_cursor.execute('SELECT * FROM prodigal')
 entries = database_cursor.fetchall()
 
-for orf in entries:
-
+for orf in entries if entries else []:
 	database_cursor.execute("SELECT * FROM antifam WHERE prodigal_id = %s"%(orf[0]))
 	resultado_antifam = database_cursor.fetchone()
 	database_cursor.execute("SELECT * FROM blast_hits WHERE prodigal_id = %s"%(orf[0]))
 	resultado_blast = database_cursor.fetchall()
 
 	if len(resultado_blast) > 0:
-
 		if resultado_blast[0][2] != 'No Hit':
 
 			database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
 					               (orf[1],orf[2],orf[3],orf[-1],'orf',orf[0],resultado_antifam[2]))
-			database_connection.commit()
+database_connection.commit()
 
 database_cursor.execute('SELECT * FROM trnascan')
 entries = database_cursor.fetchall()
 
-for trna in entries:
+for trna in entries if entries else []:
 
 	database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
 		                    (trna[1],trna[2],trna[3],trna[4],'trna',trna[0],'True'))
@@ -1102,7 +1171,7 @@ for trna in entries:
 database_cursor.execute('SELECT * FROM rnammer')
 entries = database_cursor.fetchall()
 
-for rrna in entries:
+for rrna in entries if entries else []:
 
 	database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
 		                    (rrna[1],rrna[2],rrna[3],rrna[4],'rrna',rrna[0],'True'))
@@ -1111,7 +1180,7 @@ for rrna in entries:
 database_cursor.execute('SELECT * FROM infernal')
 entries = database_cursor.fetchall()
 
-for ncrna in entries:
+for ncrna in entries if entries else []:
 
 	database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
 		                    (ncrna[1],ncrna[2],ncrna[3],ncrna[4],'ncrna',ncrna[0],'True'))
@@ -1120,7 +1189,7 @@ for ncrna in entries:
 database_cursor.execute('SELECT * FROM aragorn')
 entries = database_cursor.fetchall()
 
-for tmrna in entries:
+for tmrna in entries if entries else []:
 
 	database_cursor.execute("INSERT INTO raw_features VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)",
 		                     (tmrna[1],tmrna[2],tmrna[3],tmrna[4],'tmrna',tmrna[0],'True'))
@@ -1148,7 +1217,6 @@ for sequencia in sequencias:
 
 	for prodigal_gene_index, prodigal_gene in enumerate(prodigal_genes):
 		corrected = False
-		database_cursor.execute('SELECT * FROM raw_features WHERE start <= "{0}"'.format(prodigal_gene[2]))
 		database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id = "{0}"'.format(prodigal_gene[0]))
 		blast_hits = [(blast_hit[3],blast_hit[6],blast_hit[10]) for blast_hit in database_cursor.fetchall()]
 		blast_hits_query = sorted(blast_hits,
@@ -1160,121 +1228,78 @@ for sequencia in sequencias:
 								                blast_hit[0] for blast_hit in blast_hits
 										     ].count(hit[1]))[::-1][0:5]
 
-		# correct the gene if it has a hit on antifam
+		"# correct the gene if it has a hit on antifam"
 
-		database_cursor.execute("SELECT * FROM raw_features WHERE data_id=%s AND type = 'orf'"%(prodigal_gene[0]))
-		feature_data =  database_cursor.fetchone()
-		if feature_data:
-			if feature_data != 'False':
+		database_cursor.execute('SELECT * from antifam WHERE prodigal_id = ? AND correct = ?',(prodigal_gene[0],'False',))
+
+		if database_cursor.fetchone():
+
+			if has_antifam_hit(prodigal_gene,sequencia):
 				for shorter_gene in reduce_cds(prodigal_gene,sequencia):
-					if prodigal_gene[4] == '+':
-						shorter_protein = Seq(sequencia[2][shorter_gene[2]-1:shorter_gene[3]]).translate()
-					if prodigal_gene[4] == '-':
-						shorter_protein = Seq(str(Seq(sequencia[2][shorter_gene[2]-1:shorter_gene[3]]).reverse_complement())).translate()
-					temp_fasta = open('%s/temp.fasta'%arguments.output_dir,'w')
-					temp_fasta.write(">{0} {1}\n{2}\n".format(prodigal_gene, shorter_gene,shorter_protein))
-					temp_fasta.close()
-					subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
-				   '-o {2}/temp.fasta {0}/databases/antifam/AntiFam.hmm '
-				   '{2}/temp.fasta').format(script_location,
-				   	arguments.threads,arguments.output_dir),
-				   	shell=True,
-				   	stdout=devnull,
-				   	stderr=devnull)
-					antifam_hit = False
-					antifam_output = SearchIO.parse('%s/temp.fasta'%arguments.output_dir,'hmmer3-text')
-					for resultado in antifam_output:
-						for hsp in resultado.hsps:
-							if hsp.evalue <= arguments.antifam_evalue:
-								antifam_hit = True
-					if not antifam_hit:
+					if not has_antifam_hit(shorter_gene,sequencia):
+						if prodigal_gene[4] == '+':
+							database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
+						if prodigal_gene[4] == '-':
+							database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
+						database_connection.commit()
+						database_cursor.execute('UPDATE antifam SET correct = ? WHERE prodigal_id = ?',('True', prodigal_gene[0],))
+						prodigal_gene = shorter_gene
 						break
-				if not antifam_hit:
-					corrected = True
-					if prodigal_gene[4] == '+':
-						database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
-					if prodigal_gene[4] == '-':
-						database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
 
-					break
-
-		# Reduce gene by shifting the 5' terminus
+		"# Reduce gene by shifting the 5' terminus"
 
 		if blast_hits_query[0][0] > 1:
 			closest_gene = prodigal_gene
 			closest_distance = blast_hits_query[0][0]
 			for shorter_gene in reduce_cds(prodigal_gene,sequencia):
 				protein_reduction = abs(float((prodigal_gene[3] - prodigal_gene[2] + 1) \
-				                        - (shorter_gene[3] - shorter_gene[2] + 1)) / 3)
+					                        - (shorter_gene[3] - shorter_gene[2] + 1)) / 3)
 				distance = abs(blast_hits_query[0][0] - protein_reduction)
 				if distance < closest_distance:
 					closest_distance = distance
 					closest_gene = shorter_gene
-				else:
-					break
-
-
-		if prodigal_gene[4] == '+':
-			database_cursor.execute('SELECT * FROM raw_features WHERE start < %s ORDER BY start'%(prodigal_gene[2]))
-			downtream_features = database_cursor.fetchall()
-			if downtream_features:
-				extension_limit = downtream_features[-1][2]
-			else:
-				extension_limit = 1
-
-		if prodigal_gene[4] == '-':
-			database_cursor.execute('SELECT * FROM raw_features WHERE start > %s ORDER BY start'%(prodigal_gene[3]))
-			downtream_features = database_cursor.fetchall()
-			if downtream_features:
-				extension_limit = downtream_features[0][2]
-			else:
-				extension_limit = len(sequencia[2])
-
-		if not corrected and blast_hits_query[0][1] > 1:
-			closest_gene = prodigal_gene
-			closest_distance = blast_hits_query[0][0]
-			initial_distance = closest_distance
-			for longer_gene in extend_cds(prodigal_gene,sequencia,extension_limit):
-				protein_reduction = abs(float((prodigal_gene[3] - prodigal_gene[2] + 1) \
-				                             - (shorter_gene[3] - shorter_gene[2] + 1)) / 3)
-				distance = abs(blast_hits_query[0][0] - protein_reduction)
-				if distance < closest_distance:
-					closest_distance = distance
-					closest_gene = shorter_gene
-				else:
-					break
-
-			if initial_distance > closest_distance:
-				pass
-		if not corrected and blast_hits_hit[0][1]:
-			closest_gene = prodigal_gene
-			closest_distance = blast_hits_hit[0][0]
-			initial_distance = closest_distance
-			antifam_hit = False
-			for extended_gene in extend_cds(prodigal_gene,sequencia,limit=extension_limit):
-				if prodigal_gene[4] == '+':
-					extended_protein = Seq(sequencia[2][extended_gene[2]-1:extended_gene[3]]).translate()
-				if prodigal_gene[4] == '-':
-					extended_protein = Seq(str(Seq(sequencia[2][extended_gene[2]-1:extended_gene[3]]).reverse_complement())).translate()
-				temp_fasta = open('%s/temp.fasta'%arguments.output_dir,'w')
-				temp_fasta.write(">{0} {1}\n{2}\n".format(prodigal_gene, extended_gene,extended_protein))
-				temp_fasta.close()
-				subprocess.call(('{0}/bin/hmmer3/src/./hmmscan -cpu {1} '
-					           '-o {2}/temp.fasta {0}/databases/antifam/AntiFam.hmm '
-					           '{2}/temp.fasta').format(script_location,
-					           arguments.threads,arguments.output_dir),
-					           shell=True,
-					           stdout=devnull,
-					           stderr=devnull)
-				antifam_output = SearchIO.parse('%s/temp.fasta'%arguments.output_dir,
-					                            'hmmer3-text')
-				for resultado in antifam_output:
-					for hsp in resultado.hsps:
-						if hsp.evalue <= arguments.antifam_evalue:
-							antifam_hit = True
-				if not antifam_hit:
+					corrected = True
 					database_cursor.execute("UPDATE raw_features SET spurious='True' WHERE data_id=%s"%(prodigal_gene[0]))
+					corrected = True
+					if prodigal_gene[4] == '+':
+						database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
+					if prodigal_gene[4] == '-':
+						database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
+				else:
 					break
+				database_connection.commit()
+		
+		"# Extend gene by shifting the 5' terminus"
+
+		if blast_hits_query[0][1] > 1:
+			closest_gene = prodigal_gene
+			if prodigal_gene[4] == '+':
+				database_cursor.execute('SELECT end FROM raw_features WHERE sequence_id =? AND start < ?',(prodigal_gene[1],prodigal_gene[2],))
+				query_result = database_cursor.fetchall()
+				if query_result:
+					extension_limit = query_result[-1][0]
+				else: 
+					extension_limit = 1
+			elif prodigal_gene[4] == '-':
+				database_cursor.execute('SELECT start FROM raw_features WHERE sequence_id =? AND start > ?',(prodigal_gene[1],prodigal_gene[2],))
+				query_result = database_cursor.fetchall()
+				if query_result:
+					extension_limit = query_result[0][0]
+				else: 
+					extension_limit = len(sequencia[1])
+			closest_query_cover, closest_hit_cover = get_coverages(prodigal_gene, sequencia)
+			for longer_gene in extend_cds(prodigal_gene,sequencia, extension_limit):
+				if not has_antifam_hit(longer_gene,sequencia):
+					query_cover, hit_cover = get_coverages(longer_gene, sequencia)
+					if hit_cover > closest_hit_cover and query_cover > closest_query_cover:
+						closest_gene = longer_gene
+						if prodigal_gene[4] == '+':
+							database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(longer_gene[2], prodigal_gene[0]))
+						if prodigal_gene[4] == '-':
+							database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(longer_gene[3], prodigal_gene[0]))
+				else:
+					break
+			database_connection.commit()
 
 
 
@@ -1291,31 +1316,15 @@ database_cursor.execute('SELECT * FROM sequences')
 sequencias = database_cursor.fetchall()
 
 for sequencia in sequencias:
-
 	database_cursor.execute('SELECT * FROM raw_features WHERE sequence_id = %s AND type = "orf"'%sequencia[0])
 	prodigal_genes = database_cursor.fetchall()
-
 	for prodigal_gene_index, prodigal_gene in enumerate(prodigal_genes):
-		if prodigal_gene_index < (len(prodigal_genes)-1):
-			database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id={0}'.format(prodigal_gene[6]))
-			current_gene_blast_hits = database_cursor.fetchall()
-			current_gene_hits_list = []
-			database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id={0}'.format(int(prodigal_gene[6])+1))
-			next_gene_blast_hits = database_cursor.fetchall()
-			next_gene_hits_list = []
-			for hit in current_gene_blast_hits:
-				current_gene_hits_list.append((hit[12],hit[6],hit[7],hit[8]))
-			for hit in next_gene_blast_hits:
-				next_gene_hits_list.append((hit[12],hit[6],hit[7],hit[8]))
-			for hit_c in current_gene_hits_list:
-				for hit_n in next_gene_hits_list:
-					if hit_c[0] == hit_n[0]:
-						hit_c_qc = set(range(hit_c[1],hit_c[2]))
-						hit_n_qc = set(range(hit_n[1],hit_n[2]))
-						if float(len(hit_c_qc.intersection(hit_n_qc)))/hit_c[3] < 0.1:
-							database_cursor.execute("INSERT INTO putative_frameshifted VALUES (NULL,%s)"%(prodigal_gene[0]))
-							database_cursor.execute("INSERT INTO putative_frameshifted VALUES (NULL,%s)"%(prodigal_genes[prodigal_gene_index+1][0]))
-							database_connection.commit()
+		database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id={0}'.format(prodigal_gene[6]))
+		current_gene_blast_hit = database_cursor.fetchone()
+		hit_coverage = float(current_gene_blast_hit[4]-current_gene_blast_hit[3])/current_gene_blast_hit[5]
+		if hit_coverage < 0.9:
+			database_cursor.execute("INSERT INTO putative_frameshifted VALUES (NULL,%s)"%(prodigal_gene[0]))
+			database_connection.commit()
 
 #  -----------------------------------------------------------------------------
 #  Remove overlapping CDSs
@@ -1376,14 +1385,14 @@ for sequence in sequences:
 					for shorter_gene in reduce_cds(prodigal_gene,sequence):
 						new_orf_feature_range = set(range(shorter_gene[2],shorter_gene[3]+1))
 						intersection = new_orf_feature_range.intersection(non_orf_feature_range)
-						if not intersection:
-							database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id={0}'.format(orf_feature[6]))
-							hits = database_cursor.fetchall()
+						if len(intersection) > 3:
+							database_cursor.execute('INSERT INTO final_features VALUES (NULL,%s)'%shorter_gene[0])
+							if prodigal_gene[4] == '+':
+								database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], orf_feature[6]))
+							if prodigal_gene[4] == '-':
+								database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], orf_feature[6]))
+							database_cursor.execute('INSERT INTO final_features VALUES (NULL,%s)'%orf_feature[0])
 							break
-					
-					#else:
-					#
-					#	break
 
 			else:
 
@@ -1618,7 +1627,7 @@ for index,sequence in enumerate(sequences):
 
 					database_cursor.execute('SELECT * FROM putative_frameshifted WHERE raw_feature_id =%s'%feature[0])
 					if database_cursor.fetchall():
-						file_genbank += '                     /note="This feature shares one or more BLAST hits with other neighbor features. We strongly recommend manual revision."\n'
+						file_genbank += '                     /note="We strongly recommend manual revision."\n'
 
 
 					if strand == 1:
@@ -1641,7 +1650,7 @@ for index,sequence in enumerate(sequences):
 					file_table += '\t\t\tnote\tSimilar to Uniprot:%s\n'%(uniprot_hit)
 					database_cursor.execute('SELECT * FROM putative_frameshifted WHERE raw_feature_id =%s'%feature[0])
 					if database_cursor.fetchall():
-						file_table += "\t\t\tnote\tThis feature shares one or more BLAST hits with other neighbor features. We strongly recommend manual revision\n"
+						file_table += "\t\t\tnote\tWe strongly recommend manual revision\n"
 
 
 				continue
