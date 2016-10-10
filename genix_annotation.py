@@ -1216,6 +1216,9 @@ for sequencia in sequencias:
 	# iterate all prodigal genes predicted in the given sequence
 
 	for prodigal_gene_index, prodigal_gene in enumerate(prodigal_genes):
+
+		print prodigal_gene
+
 		corrected = False
 		database_cursor.execute('SELECT * FROM blast_hits WHERE prodigal_id = "{0}"'.format(prodigal_gene[0]))
 		blast_hits = [(blast_hit[3],blast_hit[6],blast_hit[10]) for blast_hit in database_cursor.fetchall()]
@@ -1228,7 +1231,7 @@ for sequencia in sequencias:
 								                blast_hit[0] for blast_hit in blast_hits
 										     ].count(hit[1]))[::-1][0:5]
 
-		"# correct the gene if it has a hit on antifam"
+		"   # correct the gene if it has a hit on antifam"
 
 		database_cursor.execute('SELECT * from antifam WHERE prodigal_id = ? AND correct = ?',(prodigal_gene[0],'False',))
 
@@ -1238,38 +1241,38 @@ for sequencia in sequencias:
 				for shorter_gene in reduce_cds(prodigal_gene,sequencia):
 					if not has_antifam_hit(shorter_gene,sequencia):
 						if prodigal_gene[4] == '+':
-							database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
+							database_cursor.execute("UPDATE raw_features SET start=%s,spurious='True' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
 						if prodigal_gene[4] == '-':
-							database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
+							database_cursor.execute("UPDATE raw_features SET end=%s,spurious='True' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
 						database_connection.commit()
 						database_cursor.execute('UPDATE antifam SET correct = ? WHERE prodigal_id = ?',('True', prodigal_gene[0],))
 						prodigal_gene = shorter_gene
 						break
 
-		"# Reduce gene by shifting the 5' terminus"
+		"   # Reduce gene by shifting the 5' terminus"
 
 		if blast_hits_query[0][0] > 1:
 			closest_gene = prodigal_gene
-			closest_distance = blast_hits_query[0][0]
+			closest_query_cover, closest_hit_cover = get_coverages(prodigal_gene, sequencia)
+			print 'COVERAGE INICIAL:',closest_query_cover, closest_hit_cover
 			for shorter_gene in reduce_cds(prodigal_gene,sequencia):
-				protein_reduction = abs(float((prodigal_gene[3] - prodigal_gene[2] + 1) \
-					                        - (shorter_gene[3] - shorter_gene[2] + 1)) / 3)
-				distance = abs(blast_hits_query[0][0] - protein_reduction)
-				if distance < closest_distance:
-					closest_distance = distance
+				query_cover, hit_cover = get_coverages(closest_gene, sequencia)
+				if hit_cover > closest_hit_cover and query_cover > closest_query_cover:
 					closest_gene = shorter_gene
-					corrected = True
+					closest_hit_cover = hit_cover
+					closest_query_cover = query_cover
 					database_cursor.execute("UPDATE raw_features SET spurious='True' WHERE data_id=%s"%(prodigal_gene[0]))
 					corrected = True
+					print 'COVERAGE CORRIGIDA:',closest_query_cover, closest_hit_cover
 					if prodigal_gene[4] == '+':
-						database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
+						database_cursor.execute("UPDATE raw_features SET start=%s,spurious='True' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[2], prodigal_gene[0]))
 					if prodigal_gene[4] == '-':
-						database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
+						database_cursor.execute("UPDATE raw_features SET end=%s,spurious='True' WHERE data_id=%s AND type = 'orf'"%(shorter_gene[3], prodigal_gene[0]))
 				else:
 					break
 				database_connection.commit()
 		
-		"# Extend gene by shifting the 5' terminus"
+		"   # Extend gene by shifting the 5' terminus"
 
 		if blast_hits_query[0][1] > 1:
 			closest_gene = prodigal_gene
@@ -1293,10 +1296,14 @@ for sequencia in sequencias:
 					query_cover, hit_cover = get_coverages(longer_gene, sequencia)
 					if hit_cover > closest_hit_cover and query_cover > closest_query_cover:
 						closest_gene = longer_gene
+						closest_query_cover = query_cover
+						closest_hit_cover = hit_cover
 						if prodigal_gene[4] == '+':
-							database_cursor.execute("UPDATE raw_features SET start=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(longer_gene[2], prodigal_gene[0]))
+							database_cursor.execute("UPDATE raw_features SET start=%s,spurious='True' WHERE data_id=%s AND type = 'orf'"%(longer_gene[2], prodigal_gene[0]))
 						if prodigal_gene[4] == '-':
-							database_cursor.execute("UPDATE raw_features SET end=%s,spurious='False' WHERE data_id=%s AND type = 'orf'"%(longer_gene[3], prodigal_gene[0]))
+							database_cursor.execute("UPDATE raw_features SET end=%s,spurious='True' WHERE data_id=%s AND type = 'orf'"%(longer_gene[3], prodigal_gene[0]))
+					else:
+						break
 				else:
 					break
 			database_connection.commit()
