@@ -1254,7 +1254,7 @@ for sequencia in sequencias:
 		if blast_hits_query[0][0] > 1 and not corrected:
 			closest_gene = prodigal_gene
 			closest_query_cover, closest_hit_cover = get_coverages(prodigal_gene, sequencia)
-			#print 'COVERAGE INICIAL:',closest_query_cover, closest_hit_cover
+			print 'COVERAGE INICIAL:',closest_query_cover, closest_hit_cover
 			for shorter_gene in reduce_cds(prodigal_gene,sequencia):
 				query_cover, hit_cover = get_coverages(closest_gene, sequencia)
 				if hit_cover > closest_hit_cover and query_cover > closest_query_cover:
