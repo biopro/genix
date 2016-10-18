@@ -423,7 +423,15 @@ database_connection = sqlite3.connect(':memory:')
 database_cursor = database_connection.cursor() 
 database_cursor.execute('PRAGMA synchronous = OFF')
 database_cursor.execute('PRAGMA journal_mode = MEMORY')
+database_cursor.execute('PRAGMA locking_mode = EXCLUSIVE')
+database_cursor.execute('PRAGMA temp_store = MEMORY')
+database_cursor.execute('PRAGMA count_changes = OFF')
+database_cursor.execute('PRAGMA PAGE_SIZE = 4096')
+database_cursor.execute('PRAGMA default_cache_size=700000') 
+database_cursor.execute('PRAGMA cache_size=700000')
+database_cursor.execute('PRAGMA compile_options')
 database_connection.commit() 
+
 database_cursor.execute('''
 	CREATE TABLE sequences (id integer PRIMARY KEY AUTOINCREMENT,
 	header text, sequence text)
