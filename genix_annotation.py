@@ -239,7 +239,7 @@ def has_antifam_hit(gene, sequencia):
 	protein_fasta = open('{0}/temp.fasta'.format(arguments.output_dir),'w')
 	protein_fasta.write('>temp\n{0}\n'.format(protein))
 	protein_fasta.close()
-	subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
+	subprocess.call(('{0}/bin/hmmer3/./hmmscan --cpu {1} '
 			         '-o {2}/temp_hmmer.txt {0}/databases/antifam/AntiFam.hmm '
 			         '{2}/temp.fasta').format(script_location,
 			         arguments.threads,arguments.output_dir),
@@ -925,7 +925,7 @@ for sequence_entry in sequence_entries:
 
 	for accs in blast_hits_accs:
 
-		subprocess.call(('{0}/bin/infernal/src/cmsearch '
+		subprocess.call(('{0}/bin/infernal/./cmsearch '
 			         '--tblout {1}/temp_infernal.txt --rfam --cpu {3} '
 			         '{0}/databases/rfam/CMs/{2}.cm {1}/temp.fasta').format(
 			            	script_location,arguments.output_dir,accs,arguments.threads),
@@ -1008,7 +1008,7 @@ for sequence_entry in sequence_entries:
 		#RUN AntiFam
 
 		prodigal_correct = 'True'
-		subprocess.call(('{0}/bin/hmmer3/src/./hmmscan --cpu {1} '
+		subprocess.call(('{0}/bin/hmmer3/./hmmscan --cpu {1} '
 			           '-o {2}/temp_hmmer.txt {0}/databases/antifam/AntiFam.hmm '
 			           '{2}/temp.fasta').format(script_location,
 			           arguments.threads,arguments.output_dir),
