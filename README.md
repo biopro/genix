@@ -16,6 +16,10 @@ module to submit genomes, check the status and retrieve the results in Genbank f
 still very limited, we believe this tool will already be useful to perform batch submissions in just a
 few Python lines of code.
 
+## Be aware
+
+The *ab initio* gene prediction in microbial genomes is usually pretty accurate, but we strongly recommend manual revision for those cases where there is the intention to perform a deeper analysis of some specific gene. Usually the most common errors found in microbial genome annotations are associated with wrongly-identified start codons, as is possible to have two or more start codons (eg: ATGs) in the same frame, and located close to each other. To reduce this type of error, we have a added a start codon correction step after the protein annotation, but even after this step it is also recommended a manual curation, as the protein databases, specially those that are not manually curated, are full of misannotated proteins. 
+
 #### Requeriments
 
 **Operating System:** Linux (eg: Ubuntu) 64-bits
