@@ -317,9 +317,6 @@ parser.add_argument("-blastrnae","--blast_rna_evalue",
 
 parser.add_argument("-nfernale","--infernal_evalue",default=0.0001)
 
-parser.add_argument("-sub","--submission_template",
-	                help='Template file for NCBI submission')
-
 parser.add_argument("-mg","--min_gap",
 	                help='Minimum length of a gap to annotate',
 	                default=1)
@@ -340,20 +337,6 @@ parser.add_argument("-nst","--institution", help='Name of the research center',
 
 parser.add_argument("-sp","--search_program",default="BLAST",choices=['BLAST'])
 
-parser.add_argument("-source","--source_information",
-	                help='String containing the source information for tbl2asn',
-	                type=str,default='')
-
-parser.add_argument("-gap","--gap_evidence",
-	                help='Information used for scaffolding',
-	                choices=['paired-ends', 'align-genus', 'align-xgenus',
-	                         'align-trnscpt', 'within-clone', 'clone-contig',
-	                         'map', 'strobe'],
-	                default='paired-ends')
-
-parser.add_argument("-ugl","--unknown_gap_length",
-	                help=('Use if the length of the gaps '
-	                	  'inside de scaffolds is unknow'))
 
 arguments = parser.parse_args()
 
