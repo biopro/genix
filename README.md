@@ -93,23 +93,41 @@ usage: genix_annotation.py [-h] -i INPUT [-o OUTPUT_DIR] [-t THREADS] -dbp
                            PROTEIN_DATABASE [-antie ANTIFAM_EVALUE]
                            [-blaste BLAST_EVALUE]
                            [-blastrnae BLAST_RNA_EVALUE]
-                           [-nfernale INFERNAL_EVALUE]
-                           [-sub SUBMISSION_TEMPLATE] [-mg MIN_GAP]
+                           [-nfernale INFERNAL_EVALUE] [-mg MIN_GAP]
                            [-gc {11,4}] [-sl SCAFFOLD_LABEL] [-lt LOCUS_TAG]
                            [-nst INSTITUTION] [-sp {BLAST}]
-                           [-ugl UNKNOWN_GAP_LENGTH]
+
 ```
 
 **`-i / --input`** **:** indicates the FASTA file that will be used as inputs.
-**`-o / --output_dir`** **:** indicates the FASTA file that will be used as inputs.
-**`-t / --threads`** **:** indicates the FASTA file that will be used as inputs.
-**`-dbp / --protein_database`** **:** indicates the FASTA file that will be used as inputs.
-**`-antie / --antifam_evalue`** **:** indicates the FASTA file that will be used as inputs.
-**`-i / --input`** **:** indicates the FASTA file that will be used as inputs.
-**`-i / --input`** **:** indicates the FASTA file that will be used as inputs.
-**`-i / --input`** **:** indicates the FASTA file that will be used as inputs.
-**`-i / --input`** **:** indicates the FASTA file that will be used as inputs.
-**`-i / --input`** **:** indicates the FASTA file that will be used as inputs.
+
+**`-o / --output_dir`** **:** indicates the directory were the results will be saved.
+
+**`-t / --threads`** **:** indicates the number of threads that will be used by BLAST, INFERNAL and HMMER.
+
+**`-dbp / --protein_database`** **:** indicates the BLAST protein database to be used.
+
+**`-antie / --antifam_evalue`** **:** indicates the e-value threshold that will be used when processing the results from the HMMER search against the Antifam database.
+
+**`-blaste / --blast_evalue`** **:** indicates the e-value threshold that will be used when processing the results from the BLAST search against the protein database.
+
+**`-blastnrae / --blast_rna_evalue`** **:** indicates the e-value threshold that will be used when processing the results from the BLAST search against the Rfam database.
+
+**`-nfernale / --invernal_evalue`** **:** indicates the e-value threshold that will be used when processing the results from the INFERNAL search against the Rfam database.
+
+**`-gc`** **:** The genetic code that will be used. Can be "11" (default bacteria genetic code) of "4" (*Mycoplasma*).
+
+**`-sl`** **:** The prefix of the that will be used to index the scaffolds.
+
+**`-lt`** **:** The `locus_tag` prefix of the that will be used to index the scaffolds.
+
+**`-mg / --min_gap`** **:** minimum size of the runs of Ns to distinguish it from base-calling errors.
+
+**`-nst`** **:** indicates the institution that must the indicated in the `protein_id` qualifiers of the CDSs.
+
+**`-sp`** **:** the search program that will be used. In the current implementation Genix only supports BLAST, but we intend to provide suport for BLAT and USEARCH in future releases.
+
+**`-nst`** **:** indicates the FASTA file that will be used as inputs.
 
 #### Running the Example datasets
 
@@ -117,6 +135,35 @@ usage: genix_annotation.py [-h] -i INPUT [-o OUTPUT_DIR] [-t THREADS] -dbp
 $ cd test_data/
 $ bash run_annotation.sh
 ```
+
+The code of this script has the following commands:
+
+```shellscript
+#!/usr/bin/env bash
+
+##### THE DIRECTORIES
+
+if [ ! -d database ]; then
+	mkdir database
+fi
+
+if [ ! -d output ]; then
+	mkdir output
+fi
+
+##### DATABASE PREPARATION
+
+bash ../scripts/get_database.sh 561 database/e.coli 0.95
+
+##### RUN THE ANNOTATION PIPELINE
+
+python ../genix_annotation.py -i e.coli_K12.fasta -dbp database/e.coli \
+       -o output/ --threads 4
+
+```
+
+This script prepares two directories: `database/` (to store the files from the BLAST database) and `output/` (to store the results from the annotation). To prepare the database, the `tax_id` "561" is used, which corresponds to the *Escherichia coli* taxon, and generates the database "e.coli" that is saved in the `database/`. To perform tha annotation, Genix takes as input the file `e.coli_K12.fasta`, which contains the genome sequence of *Escherichia coli* strain K-12, and uses the database generated in the previous step the the protein annotation. Finally, the intermediary files and the results will be saved to the directory `output/`. The argument `--threads 4` indicates that the programs from the packages `BLAST`, `INFERNAL` and `HMMER` will be executed using 4 threads.
+
 
 ## WebAPI
 
