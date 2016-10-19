@@ -32,8 +32,8 @@ few Python lines of code.
 #### clonning the repository
 
 ```shellscript
-git clone https://github.com/fredericokremer/genix/
-cd genix
+$ git clone https://github.com/fredericokremer/genix/
+$ cd genix
 ```
 
 #### Editing the source code
@@ -45,6 +45,11 @@ correctly specified. Check if the binaries Prodigal (“bin/prodigal/”), Arago
 #### Installing the dependences
 
 To install the Python and Perl modules in Ubuntu/Debian-based computers we have a shell script "install_dependences.sh" in the directory "dependences/", along with a "requeriments.txt" file for PIP. 
+
+```shellscript
+$ cd dependence/
+$ sudo bash install_dependences.sh
+```
 
 ## Using Genix
 
@@ -58,7 +63,9 @@ The user may also create an optimized protein database for a given taxonomic gro
 
 #### Running the annotation
 
-`python genix_annotation.py`
+```shellscript
+$ python genix_annotation.py
+```
 
 #### Running the Example datasets
 
@@ -78,6 +85,8 @@ First, create a dictionary object with the following information (yes, in this v
 add all values, but we are working on it, so as soon as possible it will change).
 
 ```python
+#!/usr/bin/env python
+
 submission_data = {
 	'user_email' : 'fred.s.kremer@gmail.com',
 	'user_password' : '1234',
