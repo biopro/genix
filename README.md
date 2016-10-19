@@ -105,7 +105,7 @@ located in the directory “WebAPI_example” uses the `requests` to send and re
 using HTTP POST requests. We are still working on the development of the API, but it may already
 be useful for some tasks.
 
-### Submission
+#### Submission
 
 First, create a dictionary object with the following information (yes, in this version it is necessary to
 add all values, but we are working on it, so as soon as possible it will change).
@@ -144,11 +144,12 @@ submission_data = {
 	}
 ```
 
-### Now, send it to the server as a JSON string.
+#### Now, send it to the server as a JSON string.
 
 ```python
 return_data = requests.post("http://labbioinfo.ufpel.edu.br/cgi-bin/genix_api.py",
                              data={'mode':'submission','data': json.dumps(submission_data)})
+job_id = json.loads(return_data.text)['job_id']
 ```
 
 The return_data receives the value that is passed by the server after the request. In not error
@@ -156,6 +157,39 @@ occurred, the return_data will receive a JSON string, that can be converted to a
 using the JSON module. The JSON object contains the JOB_ID of the submitted genome, so you
 may use it to retrieve the result in a future moment.
 
+#### Retrieving the status of a job
+
+```python
+
+get_status_data = {
+    'user_email' : 'fred.s.kremer@gmail.com',
+    'user_password' : '1234',
+    'job_id':job_id
+}
+
+return_data = requests.post("http://labbioinfo.ufpel.edu.br/cgi-bin/genix_api.py",
+                            data={'mode':'get_status','data': json.dumps(
+                                  get_status_data)})
+				  
+```
+
+####
+
+```python
+
+get_results_data = {
+    'user_email' : 'fred.s.kremer@gmail.com',
+    'user_password' : '1234',
+    'job_id':job_id
+}
+
+result_data = requests.post("http://labbioinfo.ufpel.edu.br/cgi-bin/genix_api.py",
+                            data={'mode':'get_results','data': json.dumps(
+                                  get_results_data)})
+
+genbank_file = json.loads(result_data.text)['file_genbank']
+
+```
 ## Webserver
 
 Genix is also available as an webserver through the URL [http://labbioinfo.ufpel.edu.br/genix](http://labbioinfo.ufpel.edu.br/genix).
