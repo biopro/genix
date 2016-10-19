@@ -65,11 +65,33 @@ The user may also create an optimized protein database for a given taxonomic gro
 
 ```shellscript
 $ python genix_annotation.py
+
+############################################################
+#////////// Genix Annotation //////////////////////////////#
+# An automated pipeline for bacterial genome annotation    #
+# Version: 0.4                                             #
+# Reference: KREMER et al, 2016                            #
+############################################################
+
+usage: genix_annotation.py [-h] -i INPUT [-o OUTPUT_DIR] [-t THREADS] -dbp
+                           PROTEIN_DATABASE [-antie ANTIFAM_EVALUE]
+                           [-blaste BLAST_EVALUE]
+                           [-blastrnae BLAST_RNA_EVALUE]
+                           [-nfernale INFERNAL_EVALUE]
+                           [-sub SUBMISSION_TEMPLATE] [-mg MIN_GAP]
+                           [-gc {11,4}] [-sl SCAFFOLD_LABEL] [-lt LOCUS_TAG]
+                           [-nst INSTITUTION] [-sp {BLAST}]
+                           [-ugl UNKNOWN_GAP_LENGTH]
 ```
+
+
 
 #### Running the Example datasets
 
-
+```shellscript
+$ cd test_data/
+$ bash run_annotation.sh
+```
 
 ## WebAPI
 
